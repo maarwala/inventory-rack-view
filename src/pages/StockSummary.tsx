@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 const StockSummaryPage: React.FC = () => {
   const [summary, setSummary] = useState<StockSummary[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [rackFilter, setRackFilter] = useState<string>('');
+  const [rackFilter, setRackFilter] = useState<string>('all');
   const [availableRacks, setAvailableRacks] = useState<string[]>([]);
   const { toast } = useToast();
 
@@ -39,7 +39,7 @@ const StockSummaryPage: React.FC = () => {
 
   const filteredSummary = summary.filter(item => {
     const matchesSearch = item.productName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRack = !rackFilter || item.rack === rackFilter;
+    const matchesRack = rackFilter === 'all' || item.rack === rackFilter;
     return matchesSearch && matchesRack;
   });
 
@@ -84,7 +84,7 @@ const StockSummaryPage: React.FC = () => {
             <SelectValue placeholder="Filter by rack" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Racks</SelectItem>
+            <SelectItem value="all">All Racks</SelectItem>
             {availableRacks.map(rack => (
               <SelectItem key={rack} value={rack}>
                 {rack}
@@ -123,7 +123,7 @@ const StockSummaryPage: React.FC = () => {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-6">
-                  {searchTerm || rackFilter ? 'No products found matching your search criteria.' : 'No products found. Add products to see summary.'}
+                  {searchTerm || rackFilter !== 'all' ? 'No products found matching your search criteria.' : 'No products found. Add products to see summary.'}
                 </TableCell>
               </TableRow>
             )}
