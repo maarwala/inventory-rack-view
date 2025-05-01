@@ -3,11 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PageHeader from '@/components/PageHeader';
 import { getStockSummary } from '@/services/dataService';
 import { StockSummary } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { FileText, Download } from 'lucide-react';
 
 const StockSummaryPage: React.FC = () => {
   const [summary, setSummary] = useState<StockSummary[]>([]);
@@ -59,13 +61,23 @@ const StockSummaryPage: React.FC = () => {
     }, 1500);
   };
 
+  // Group by rack for rack-wise view
+  const rackwiseSummary = filteredSummary.reduce((acc, item) => {
+    if (!acc[item.rack]) {
+      acc[item.rack] = [];
+    }
+    acc[item.rack].push(item);
+    return acc;
+  }, {} as Record<string, StockSummary[]>);
+
   return (
     <div>
       <PageHeader
         title="Stock Summary"
         subtitle="Current inventory status"
         action={
-          <Button onClick={handleExport}>
+          <Button onClick={handleExport} className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
             Export Summary
           </Button>
         }
@@ -94,42 +106,91 @@ const StockSummaryPage: React.FC = () => {
         </Select>
       </div>
       
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead>Rack</TableHead>
-              <TableHead>Opening Stock</TableHead>
-              <TableHead>Inward</TableHead>
-              <TableHead>Outward</TableHead>
-              <TableHead className="font-semibold">Current Stock</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredSummary.length > 0 ? (
-              filteredSummary.map((item) => (
-                <TableRow key={item.productId}>
-                  <TableCell className="font-medium">{item.productName}</TableCell>
-                  <TableCell>{item.rack}</TableCell>
-                  <TableCell>{item.openingStock}</TableCell>
-                  <TableCell className="text-emerald-600">+{item.inwardTotal}</TableCell>
-                  <TableCell className="text-red-600">-{item.outwardTotal}</TableCell>
-                  <TableCell className={`font-semibold ${item.currentStock <= 5 ? 'text-red-600' : ''}`}>
-                    {item.currentStock}
-                  </TableCell>
+      <Tabs defaultValue="product-wise" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="product-wise">Product View</TabsTrigger>
+          <TabsTrigger value="rack-wise">Rack View</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="product-wise">
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Rack</TableHead>
+                  <TableHead>Opening Stock</TableHead>
+                  <TableHead>Inward</TableHead>
+                  <TableHead>Outward</TableHead>
+                  <TableHead className="font-semibold">Current Stock</TableHead>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-6">
-                  {searchTerm || rackFilter !== 'all' ? 'No products found matching your search criteria.' : 'No products found. Add products to see summary.'}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {filteredSummary.length > 0 ? (
+                  filteredSummary.map((item) => (
+                    <TableRow key={item.productId}>
+                      <TableCell className="font-medium">{item.productName}</TableCell>
+                      <TableCell>{item.rack}</TableCell>
+                      <TableCell>{item.openingStock}</TableCell>
+                      <TableCell className="text-emerald-600">+{item.inwardTotal}</TableCell>
+                      <TableCell className="text-red-600">-{item.outwardTotal}</TableCell>
+                      <TableCell className={`font-semibold ${item.currentStock <= 5 ? 'text-red-600' : ''}`}>
+                        {item.currentStock}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6">
+                      {searchTerm || rackFilter !== 'all' ? 'No products found matching your search criteria.' : 'No products found. Add products to see summary.'}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="rack-wise">
+          {Object.entries(rackwiseSummary).length > 0 ? (
+            Object.entries(rackwiseSummary).map(([rack, items]) => (
+              <div key={rack} className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 bg-muted p-2 rounded-md">Rack: {rack}</h3>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Opening Stock</TableHead>
+                        <TableHead>Inward</TableHead>
+                        <TableHead>Outward</TableHead>
+                        <TableHead className="font-semibold">Current Stock</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((item) => (
+                        <TableRow key={item.productId}>
+                          <TableCell className="font-medium">{item.productName}</TableCell>
+                          <TableCell>{item.openingStock}</TableCell>
+                          <TableCell className="text-emerald-600">+{item.inwardTotal}</TableCell>
+                          <TableCell className="text-red-600">-{item.outwardTotal}</TableCell>
+                          <TableCell className={`font-semibold ${item.currentStock <= 5 ? 'text-red-600' : ''}`}>
+                            {item.currentStock}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-6 text-center border rounded-md">
+              {searchTerm || rackFilter !== 'all' ? 'No products found matching your search criteria.' : 'No products found. Add products to see summary.'}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
       
       <div className="mt-6">
         <div className="bg-muted p-4 rounded-md">

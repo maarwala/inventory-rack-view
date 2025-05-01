@@ -10,6 +10,8 @@ import Products from "./pages/Products";
 import Inward from "./pages/Inward";
 import Outward from "./pages/Outward";
 import StockSummary from "./pages/StockSummary";
+import Database from "./pages/Database";
+import EntrySheet from "./pages/EntrySheet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +29,8 @@ const App = () => (
             <Route path="/inward" element={<Inward />} />
             <Route path="/outward" element={<Outward />} />
             <Route path="/summary" element={<StockSummary />} />
+            <Route path="/database" element={<Database />} />
+            <Route path="/entry" element={<EntrySheet />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
