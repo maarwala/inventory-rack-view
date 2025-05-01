@@ -70,7 +70,7 @@ const Products: React.FC = () => {
         openingStock: 0 
       });
       setIsAddDialogOpen(false);
-      loadProducts();
+      loadData(); // Fix: Changed from loadProducts to loadData
     } catch (error) {
       toast({
         title: "Error",
@@ -90,7 +90,7 @@ const Products: React.FC = () => {
           description: `${currentProduct.name} has been updated successfully`
         });
         setIsEditDialogOpen(false);
-        loadProducts();
+        loadData(); // Fix: Changed from loadProducts to loadData
       } catch (error) {
         toast({
           title: "Error",
@@ -110,7 +110,7 @@ const Products: React.FC = () => {
           description: `${currentProduct.name} has been deleted successfully`
         });
         setIsDeleteDialogOpen(false);
-        loadProducts();
+        loadData(); // Fix: Changed from loadProducts to loadData
       } catch (error) {
         toast({
           title: "Error",
