@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,14 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Custom warehouse theme colors
+				warehouse: {
+					primary: '#1e88e5',
+					secondary: '#00acc1',
+					accent: '#ff9800',
+					light: '#f5f5f5',
+					dark: '#263238'
 				}
 			},
 			borderRadius: {
