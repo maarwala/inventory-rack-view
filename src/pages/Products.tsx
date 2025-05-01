@@ -6,12 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import PageHeader from '@/components/PageHeader';
-import { getProducts, addProduct, updateProduct, deleteProduct } from '@/services/dataService';
-import { Product } from '@/types';
+import { getProducts, addProduct, updateProduct, deleteProduct, getMeasurements } from '@/services/dataService';
+import { Product, Measurement } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -20,16 +22,23 @@ const Products: React.FC = () => {
   const [newProduct, setNewProduct] = useState<Omit<Product, 'id'>>({
     name: '',
     rack: '',
+    weightPerPiece: 0,
+    measurement: 'KGS',
+    temp1: '',
+    temp2: '',
+    temp3: '',
+    remark: '',
     openingStock: 0
   });
   const { toast } = useToast();
 
   useEffect(() => {
-    loadProducts();
+    loadData();
   }, []);
 
-  const loadProducts = () => {
+  const loadData = () => {
     setProducts(getProducts());
+    setMeasurements(getMeasurements());
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +58,17 @@ const Products: React.FC = () => {
         title: "Product added",
         description: `${newProduct.name} has been added successfully`
       });
-      setNewProduct({ name: '', rack: '', openingStock: 0 });
+      setNewProduct({ 
+        name: '', 
+        rack: '', 
+        weightPerPiece: 0,
+        measurement: 'KGS',
+        temp1: '',
+        temp2: '',
+        temp3: '',
+        remark: '',
+        openingStock: 0 
+      });
       setIsAddDialogOpen(false);
       loadProducts();
     } catch (error) {

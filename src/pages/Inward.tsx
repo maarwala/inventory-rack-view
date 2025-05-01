@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import PageHeader from '@/components/PageHeader';
-import { getProducts, getInwardEntries, addInwardEntry } from '@/services/dataService';
-import { Product, InwardEntry } from '@/types';
+import { getProducts, getInwardEntries, addInwardEntry, getRacks, getContainers, calculateNetWeight } from '@/services/dataService';
+import { Product, InwardEntry, Rack, Container } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 const formatDate = (dateString: string) => {
@@ -17,12 +17,22 @@ const formatDate = (dateString: string) => {
 
 const InwardEntryPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [racks, setRacks] = useState<Rack[]>([]);
+  const [containers, setContainers] = useState<Container[]>([]);
   const [entries, setEntries] = useState<InwardEntry[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newEntry, setNewEntry] = useState<Omit<InwardEntry, 'id'>>({
     productId: 0,
     quantity: 1,
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    rackId: 0,
+    containerId: 0,
+    containerQuantity: 0,
+    grossWeight: 0,
+    netWeight: 0,
+    remark1: '',
+    remark2: '',
+    remark3: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
@@ -33,6 +43,8 @@ const InwardEntryPage: React.FC = () => {
 
   const loadData = () => {
     setProducts(getProducts());
+    setRacks(getRacks());
+    setContainers(getContainers());
     setEntries(getInwardEntries());
   };
 
@@ -60,7 +72,15 @@ const InwardEntryPage: React.FC = () => {
       setNewEntry({
         productId: 0,
         quantity: 1,
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        rackId: 0,
+        containerId: 0,
+        containerQuantity: 0,
+        grossWeight: 0,
+        netWeight: 0,
+        remark1: '',
+        remark2: '',
+        remark3: ''
       });
       setIsAddDialogOpen(false);
       loadData();
