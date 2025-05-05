@@ -254,6 +254,27 @@ export const addInwardEntry = (entry: Omit<InwardEntry, 'id'>): InwardEntry => {
   return newEntry;
 };
 
+// Add the missing updateInwardEntry function
+export const updateInwardEntry = (updatedEntry: InwardEntry): InwardEntry | undefined => {
+  const index = inwardEntries.findIndex(e => e.id === updatedEntry.id);
+  if (index !== -1) {
+    inwardEntries = [
+      ...inwardEntries.slice(0, index),
+      updatedEntry,
+      ...inwardEntries.slice(index + 1)
+    ];
+    return updatedEntry;
+  }
+  return undefined;
+};
+
+// Add the missing deleteInwardEntry function
+export const deleteInwardEntry = (id: number): boolean => {
+  const initialLength = inwardEntries.length;
+  inwardEntries = inwardEntries.filter(entry => entry.id !== id);
+  return inwardEntries.length !== initialLength;
+};
+
 // Outward Services
 export const getOutwardEntries = (): OutwardEntry[] => {
   return [...outwardEntries];
@@ -264,6 +285,26 @@ export const addOutwardEntry = (entry: Omit<OutwardEntry, 'id'>): OutwardEntry =
   const newEntry = { ...entry, id: newId };
   outwardEntries = [...outwardEntries, newEntry];
   return newEntry;
+};
+
+// Add updateOutwardEntry and deleteOutwardEntry for consistency
+export const updateOutwardEntry = (updatedEntry: OutwardEntry): OutwardEntry | undefined => {
+  const index = outwardEntries.findIndex(e => e.id === updatedEntry.id);
+  if (index !== -1) {
+    outwardEntries = [
+      ...outwardEntries.slice(0, index),
+      updatedEntry,
+      ...outwardEntries.slice(index + 1)
+    ];
+    return updatedEntry;
+  }
+  return undefined;
+};
+
+export const deleteOutwardEntry = (id: number): boolean => {
+  const initialLength = outwardEntries.length;
+  outwardEntries = outwardEntries.filter(entry => entry.id !== id);
+  return outwardEntries.length !== initialLength;
 };
 
 // Stock Summary Service
@@ -310,4 +351,3 @@ export const calculateNetWeight = (grossWeight: number, containerId: number, con
   
   return grossWeight - (container.weight * containerQty);
 };
-

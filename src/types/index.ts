@@ -79,3 +79,5 @@ export interface StockSummary {
 
 export type EntryType = 'inward' | 'outward';
 
+// Update entity types to include 'inward'
+export type EntityType = 'product' | 'rack' | 'container' | 'measurement' | 'inward';
