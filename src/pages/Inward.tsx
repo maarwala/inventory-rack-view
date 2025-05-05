@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +27,7 @@ import {
   updateInwardEntry,
   deleteInwardEntry
 } from '@/services/dataService';
-import { Product, InwardEntry, Rack, Container } from '@/types';
+import { Product, InwardEntry, Rack, Container, EntityType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Pencil, Trash2 } from 'lucide-react';
 import ExcelImportDialog from '@/components/ExcelImportDialog';
@@ -237,7 +236,7 @@ const InwardEntryPage: React.FC = () => {
           <div className="flex gap-2">
             <ExcelImportDialog 
               title="Import Inward Entries" 
-              entityType="inward"
+              entityType={"inward" as EntityType}
               onImport={handleImport}
             />
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
