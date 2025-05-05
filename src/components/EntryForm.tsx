@@ -4,13 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Card, 
   CardContent, 
@@ -19,7 +13,6 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Popover,
   PopoverContent,
@@ -36,9 +29,9 @@ import {
   getContainers, 
   addInwardEntry, 
   addOutwardEntry,
-  calculateNetWeight
 } from '@/services/dataService';
 import { Product, Rack, Container, EntryType } from '@/types';
+import SearchableSelect from '@/components/SearchableSelect';
 
 interface EntryFormProps {
   type: EntryType;
@@ -65,6 +58,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedContainer, setSelectedContainer] = useState<Container | null>(null);
+  const [selectedRack, setSelectedRack] = useState<Rack | null>(null);
   const { toast } = useToast();
   
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FormValues>({
@@ -112,6 +106,13 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
   const handleContainerSelect = (containerId: number) => {
     const container = containers.find(c => c.id === parseInt(containerId.toString()));
     setSelectedContainer(container || null);
+    setValue('containerId', containerId);
+  };
+  
+  const handleRackSelect = (rackId: number) => {
+    const rack = racks.find(r => r.id === rackId);
+    setSelectedRack(rack || null);
+    setValue('rackId', rackId);
   };
   
   const handleFormSubmit = (data: FormValues) => {
@@ -157,6 +158,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
       reset();
       setSelectedProduct(null);
       setSelectedContainer(null);
+      setSelectedRack(null);
       setSearchTerm('');
       
     } catch (error) {
@@ -167,6 +169,19 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
       });
     }
   };
+  
+  // Prepare options for searchable selects
+  const rackOptions = racks.map(rack => ({
+    id: rack.id,
+    label: rack.number,
+    value: rack.id
+  }));
+
+  const containerOptions = containers.map(container => ({
+    id: container.id,
+    label: `${container.type} (${container.weight}kg)`,
+    value: container.id
+  }));
   
   return (
     <Card>
@@ -271,39 +286,32 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="rack">Rack</Label>
-              <Select onValueChange={(value) => setValue('rackId', parseInt(value))}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select rack" />
-                </SelectTrigger>
-                <SelectContent>
-                  {racks.map((rack) => (
-                    <SelectItem key={rack.id} value={rack.id.toString()}>
-                      {rack.number}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={rackOptions}
+                placeholder="Search for a rack"
+                value={watch('rackId')}
+                onChange={handleRackSelect}
+              />
+              {selectedRack && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selected rack: {selectedRack.number}
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="container">Bag/Crate</Label>
-              <Select 
-                onValueChange={(value) => {
-                  setValue('containerId', parseInt(value));
-                  handleContainerSelect(parseInt(value));
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select container" />
-                </SelectTrigger>
-                <SelectContent>
-                  {containers.map((container) => (
-                    <SelectItem key={container.id} value={container.id.toString()}>
-                      {container.type} ({container.weight} kg)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={containerOptions}
+                placeholder="Search for a container"
+                value={watch('containerId')}
+                onChange={handleContainerSelect}
+              />
+              {selectedContainer && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {selectedContainer.type} - Weight: {selectedContainer.weight} kg
+                </p>
+              )}
             </div>
           </div>
           

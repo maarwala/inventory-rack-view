@@ -14,7 +14,7 @@ import {
   TableRow, 
   TableCell 
 } from '@/components/ui/table';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   addRack, 
@@ -24,10 +24,12 @@ import {
 } from '@/services/dataService';
 import { Rack } from '@/types';
 import PageHeader from '@/components/PageHeader';
+import ExcelImportDialog from '@/components/ExcelImportDialog';
 
 const RackForm = () => {
   const [racks, setRacks] = useState<Rack[]>([]);
   const [editingRack, setEditingRack] = useState<Rack | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm<Rack>();
 
@@ -115,12 +117,57 @@ const RackForm = () => {
     setEditingRack(null);
     reset();
   };
+  
+  const handleExcelImport = (data: any[]) => {
+    try {
+      let successCount = 0;
+      
+      data.forEach(row => {
+        try {
+          addRack({
+            number: row.number || '',
+            temp1: row.temp1 || '',
+            temp2: row.temp2 || '',
+            remark: row.remark || ''
+          });
+          successCount++;
+        } catch (error) {
+          console.error('Error importing row:', row, error);
+        }
+      });
+      
+      if (successCount > 0) {
+        loadData();
+        toast({
+          title: 'Import Successful',
+          description: `Successfully imported ${successCount} racks.`
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Import Error',
+        description: `Error importing racks: ${error}`,
+        variant: 'destructive'
+      });
+    }
+  };
+  
+  const filteredRacks = racks.filter(rack => 
+    rack.number.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Rack Management" 
-        subtitle="Create, modify, and delete racks" 
+        subtitle="Create, modify, and delete racks"
+        action={
+          <ExcelImportDialog 
+            title="Import Racks from Excel" 
+            entityType="rack"
+            onImport={handleExcelImport} 
+          />
+        }
       />
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -164,8 +211,19 @@ const RackForm = () => {
         
         <div className="md:col-span-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Rack List</CardTitle>
+              <div className="relative w-64">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <Input
+                  placeholder="Search racks..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -180,7 +238,7 @@ const RackForm = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {racks.length > 0 ? racks.map((rack) => (
+                    {filteredRacks.length > 0 ? filteredRacks.map((rack) => (
                       <TableRow key={rack.id}>
                         <TableCell className="font-medium">{rack.number}</TableCell>
                         <TableCell>{rack.temp1}</TableCell>
@@ -208,7 +266,7 @@ const RackForm = () => {
                     )) : (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-6">
-                          No racks found. Add your first rack using the form.
+                          {searchTerm ? 'No matching racks found.' : 'No racks found. Add your first rack using the form.'}
                         </TableCell>
                       </TableRow>
                     )}

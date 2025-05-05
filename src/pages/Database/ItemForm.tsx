@@ -21,22 +21,27 @@ import {
   TableRow, 
   TableCell 
 } from '@/components/ui/table';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   addProduct, 
   deleteProduct, 
   getProducts, 
   updateProduct, 
-  getMeasurements 
+  getMeasurements,
+  getRacks
 } from '@/services/dataService';
-import { Product, Measurement } from '@/types';
+import { Product, Measurement, Rack } from '@/types';
 import PageHeader from '@/components/PageHeader';
+import SearchableSelect from '@/components/SearchableSelect';
+import ExcelImportDialog from '@/components/ExcelImportDialog';
 
 const ItemForm = () => {
   const [items, setItems] = useState<Product[]>([]);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [racks, setRacks] = useState<Rack[]>([]);
   const [editingItem, setEditingItem] = useState<Product | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue, watch } = useForm<Product>();
 
@@ -47,6 +52,7 @@ const ItemForm = () => {
   const loadData = () => {
     setItems(getProducts());
     setMeasurements(getMeasurements());
+    setRacks(getRacks());
   };
 
   useEffect(() => {
@@ -135,12 +141,69 @@ const ItemForm = () => {
     setEditingItem(null);
     reset();
   };
+  
+  const handleExcelImport = (data: any[]) => {
+    try {
+      let successCount = 0;
+      
+      data.forEach(row => {
+        try {
+          addProduct({
+            name: row.name || '',
+            rack: row.rack || '',
+            weightPerPiece: parseFloat(row.weightPerPiece) || 0,
+            measurement: row.measurement || 'KGS',
+            temp1: row.temp1 || '',
+            temp2: row.temp2 || '',
+            temp3: row.temp3 || '',
+            remark: row.remark || '',
+            openingStock: parseInt(row.openingStock) || 0
+          });
+          successCount++;
+        } catch (error) {
+          console.error('Error importing row:', row, error);
+        }
+      });
+      
+      if (successCount > 0) {
+        loadData();
+        toast({
+          title: 'Import Successful',
+          description: `Successfully imported ${successCount} items.`
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Import Error',
+        description: `Error importing items: ${error}`,
+        variant: 'destructive'
+      });
+    }
+  };
+  
+  const filteredItems = items.filter(item => 
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.rack.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const rackOptions = racks.map(rack => ({
+    id: rack.id,
+    label: rack.number,
+    value: rack.number
+  }));
 
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Item Management" 
         subtitle="Create, modify, and delete items" 
+        action={
+          <ExcelImportDialog 
+            title="Import Items from Excel" 
+            entityType="product"
+            onImport={handleExcelImport} 
+          />
+        }
       />
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -157,7 +220,12 @@ const ItemForm = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="rack">Rack</Label>
-                <Input id="rack" {...register('rack', { required: true })} />
+                <SearchableSelect
+                  options={rackOptions}
+                  placeholder="Search for a rack"
+                  value={watch('rack')}
+                  onChange={(value) => setValue('rack', value)}
+                />
               </div>
               
               <div className="space-y-2">
@@ -238,8 +306,19 @@ const ItemForm = () => {
         
         <div className="md:col-span-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Item List</CardTitle>
+              <div className="relative w-64">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <Input
+                  placeholder="Search items..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -255,7 +334,7 @@ const ItemForm = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.length > 0 ? items.map((item) => (
+                    {filteredItems.length > 0 ? filteredItems.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell>{item.rack}</TableCell>
@@ -284,7 +363,7 @@ const ItemForm = () => {
                     )) : (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-6">
-                          No items found. Add your first item using the form.
+                          {searchTerm ? 'No matching items found.' : 'No items found. Add your first item using the form.'}
                         </TableCell>
                       </TableRow>
                     )}
