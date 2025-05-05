@@ -1,98 +1,63 @@
 
 import { Product, InwardEntry, OutwardEntry, StockSummary, Rack, Container, Measurement } from '@/types';
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
+import { openDB, deleteDB, IDBPDatabase } from 'idb';
 
 // Database connection
-let db: Database | null = null;
+let db: IDBPDatabase | null = null;
+
+// Define database name and version
+const DB_NAME = 'warehouse-db';
+const DB_VERSION = 1;
 
 // Initialize database
 export const initDatabase = async (): Promise<void> => {
   if (!db) {
-    db = await open({
-      filename: './warehouse.db',
-      driver: sqlite3.Database
-    });
-    
-    // Create tables if they don't exist
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        rack TEXT NOT NULL,
-        weightPerPiece REAL NOT NULL,
-        measurement TEXT NOT NULL,
-        temp1 TEXT,
-        temp2 TEXT,
-        temp3 TEXT,
-        remark TEXT,
-        openingStock INTEGER NOT NULL
-      );
+    try {
+      db = await openDB(DB_NAME, DB_VERSION, {
+        upgrade(database, oldVersion, newVersion) {
+          // Create object stores if they don't exist
+          if (!database.objectStoreNames.contains('products')) {
+            const productStore = database.createObjectStore('products', { keyPath: 'id', autoIncrement: true });
+            productStore.createIndex('name', 'name', { unique: false });
+          }
+          
+          if (!database.objectStoreNames.contains('racks')) {
+            const rackStore = database.createObjectStore('racks', { keyPath: 'id', autoIncrement: true });
+            rackStore.createIndex('number', 'number', { unique: true });
+          }
+          
+          if (!database.objectStoreNames.contains('containers')) {
+            const containerStore = database.createObjectStore('containers', { keyPath: 'id', autoIncrement: true });
+            containerStore.createIndex('type', 'type', { unique: false });
+          }
+          
+          if (!database.objectStoreNames.contains('measurements')) {
+            const measurementStore = database.createObjectStore('measurements', { keyPath: 'id', autoIncrement: true });
+            measurementStore.createIndex('type', 'type', { unique: true });
+          }
+          
+          if (!database.objectStoreNames.contains('inward_entries')) {
+            const inwardStore = database.createObjectStore('inward_entries', { keyPath: 'id', autoIncrement: true });
+            inwardStore.createIndex('productId', 'productId', { unique: false });
+            inwardStore.createIndex('date', 'date', { unique: false });
+          }
+          
+          if (!database.objectStoreNames.contains('outward_entries')) {
+            const outwardStore = database.createObjectStore('outward_entries', { keyPath: 'id', autoIncrement: true });
+            outwardStore.createIndex('productId', 'productId', { unique: false });
+            outwardStore.createIndex('date', 'date', { unique: false });
+          }
+        },
+      });
       
-      CREATE TABLE IF NOT EXISTS racks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        number TEXT NOT NULL UNIQUE,
-        temp1 TEXT,
-        temp2 TEXT,
-        remark TEXT
-      );
-      
-      CREATE TABLE IF NOT EXISTS containers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        weight REAL NOT NULL,
-        remark TEXT
-      );
-      
-      CREATE TABLE IF NOT EXISTS measurements (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL UNIQUE,
-        temp1 TEXT,
-        temp2 TEXT,
-        remark TEXT
-      );
-      
-      CREATE TABLE IF NOT EXISTS inward_entries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        productId INTEGER NOT NULL,
-        quantity INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        rackId INTEGER NOT NULL,
-        containerId INTEGER NOT NULL,
-        containerQuantity INTEGER NOT NULL,
-        grossWeight REAL NOT NULL,
-        netWeight REAL NOT NULL,
-        remark1 TEXT,
-        remark2 TEXT,
-        remark3 TEXT,
-        FOREIGN KEY (productId) REFERENCES products (id),
-        FOREIGN KEY (rackId) REFERENCES racks (id),
-        FOREIGN KEY (containerId) REFERENCES containers (id)
-      );
-      
-      CREATE TABLE IF NOT EXISTS outward_entries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        productId INTEGER NOT NULL,
-        quantity INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        rackId INTEGER NOT NULL,
-        containerId INTEGER NOT NULL,
-        containerQuantity INTEGER NOT NULL,
-        grossWeight REAL NOT NULL,
-        netWeight REAL NOT NULL,
-        remark1 TEXT,
-        remark2 TEXT,
-        remark3 TEXT,
-        FOREIGN KEY (productId) REFERENCES products (id),
-        FOREIGN KEY (rackId) REFERENCES racks (id),
-        FOREIGN KEY (containerId) REFERENCES containers (id)
-      );
-    `);
-
-    // Add seed data if tables are empty
-    const productCount = await db.get('SELECT COUNT(*) as count FROM products');
-    if (productCount.count === 0) {
-      await seedInitialData();
+      // Seed initial data if stores are empty
+      const productCount = await db.count('products');
+      if (productCount === 0) {
+        await seedInitialData();
+      }
+    } catch (error) {
+      console.error('Error initializing database:', error);
+      throw error;
     }
   }
 };
@@ -102,317 +67,394 @@ const seedInitialData = async (): Promise<void> => {
   if (!db) return;
 
   // Insert racks
-  await db.run(`INSERT INTO racks (number) VALUES ('A1')`);
-  await db.run(`INSERT INTO racks (number) VALUES ('B2')`);
-  await db.run(`INSERT INTO racks (number) VALUES ('C3')`);
-  await db.run(`INSERT INTO racks (number) VALUES ('A2')`);
-  await db.run(`INSERT INTO racks (number) VALUES ('B3')`);
+  await db.add('racks', { number: 'A1', temp1: null, temp2: null, remark: null });
+  await db.add('racks', { number: 'B2', temp1: null, temp2: null, remark: null });
+  await db.add('racks', { number: 'C3', temp1: null, temp2: null, remark: null });
+  await db.add('racks', { number: 'A2', temp1: null, temp2: null, remark: null });
+  await db.add('racks', { number: 'B3', temp1: null, temp2: null, remark: null });
   
   // Insert containers
-  await db.run(`INSERT INTO containers (type, weight) VALUES ('Bag', 0.5)`);
-  await db.run(`INSERT INTO containers (type, weight) VALUES ('Crate', 2.0)`);
-  await db.run(`INSERT INTO containers (type, weight) VALUES ('Loose', 0)`);
+  await db.add('containers', { type: 'Bag', weight: 0.5, remark: null });
+  await db.add('containers', { type: 'Crate', weight: 2.0, remark: null });
+  await db.add('containers', { type: 'Loose', weight: 0, remark: null });
   
   // Insert measurements
-  await db.run(`INSERT INTO measurements (type) VALUES ('KGS')`);
-  await db.run(`INSERT INTO measurements (type) VALUES ('PCS')`);
-  await db.run(`INSERT INTO measurements (type) VALUES ('Loose')`);
+  await db.add('measurements', { type: 'KGS', temp1: null, temp2: null, remark: null });
+  await db.add('measurements', { type: 'PCS', temp1: null, temp2: null, remark: null });
+  await db.add('measurements', { type: 'Loose', temp1: null, temp2: null, remark: null });
+  
+  // Get rack IDs
+  const racks = await db.getAll('racks');
+  const rackAId = racks[0].id;
+  const rackBId = racks[1].id;
+  const rackCId = racks[2].id;
+  const rackDId = racks[3].id;
+  const rackEId = racks[4].id;
+  
+  // Get container IDs
+  const containers = await db.getAll('containers');
+  const bagId = containers[0].id;
+  const crateId = containers[1].id;
+  const looseId = containers[2].id;
   
   // Insert products
-  await db.run(`
-    INSERT INTO products (name, rack, weightPerPiece, measurement, openingStock) 
-    VALUES ('Laptop Dell XPS', 'A1', 2.5, 'KGS', 10)
-  `);
-  await db.run(`
-    INSERT INTO products (name, rack, weightPerPiece, measurement, openingStock) 
-    VALUES ('iPhone 15 Pro', 'B2', 0.2, 'PCS', 15)
-  `);
-  await db.run(`
-    INSERT INTO products (name, rack, weightPerPiece, measurement, openingStock) 
-    VALUES ('Samsung TV 55"', 'C3', 15, 'KGS', 5)
-  `);
-  await db.run(`
-    INSERT INTO products (name, rack, weightPerPiece, measurement, openingStock) 
-    VALUES ('Wireless Keyboard', 'A2', 0.5, 'PCS', 20)
-  `);
-  await db.run(`
-    INSERT INTO products (name, rack, weightPerPiece, measurement, openingStock) 
-    VALUES ('Bluetooth Speaker', 'B3', 0.8, 'PCS', 12)
-  `);
+  const product1Id = await db.add('products', {
+    name: 'Laptop Dell XPS',
+    rack: 'A1',
+    weightPerPiece: 2.5,
+    measurement: 'KGS',
+    openingStock: 10,
+    temp1: null,
+    temp2: null,
+    temp3: null,
+    remark: null
+  });
+  
+  const product2Id = await db.add('products', {
+    name: 'iPhone 15 Pro',
+    rack: 'B2',
+    weightPerPiece: 0.2,
+    measurement: 'PCS',
+    openingStock: 15,
+    temp1: null,
+    temp2: null,
+    temp3: null,
+    remark: null
+  });
+  
+  const product3Id = await db.add('products', {
+    name: 'Samsung TV 55"',
+    rack: 'C3',
+    weightPerPiece: 15,
+    measurement: 'KGS',
+    openingStock: 5,
+    temp1: null,
+    temp2: null,
+    temp3: null,
+    remark: null
+  });
+  
+  const product4Id = await db.add('products', {
+    name: 'Wireless Keyboard',
+    rack: 'A2',
+    weightPerPiece: 0.5,
+    measurement: 'PCS',
+    openingStock: 20,
+    temp1: null,
+    temp2: null,
+    temp3: null,
+    remark: null
+  });
+  
+  const product5Id = await db.add('products', {
+    name: 'Bluetooth Speaker',
+    rack: 'B3',
+    weightPerPiece: 0.8,
+    measurement: 'PCS',
+    openingStock: 12,
+    temp1: null,
+    temp2: null,
+    temp3: null,
+    remark: null
+  });
   
   // Insert inward entries
-  await db.run(`
-    INSERT INTO inward_entries (productId, quantity, date, rackId, containerId, containerQuantity, grossWeight, netWeight) 
-    VALUES (1, 5, '2025-04-25', 1, 1, 2, 13.5, 12.5)
-  `);
-  await db.run(`
-    INSERT INTO inward_entries (productId, quantity, date, rackId, containerId, containerQuantity, grossWeight, netWeight) 
-    VALUES (2, 10, '2025-04-26', 2, 2, 1, 4.0, 2.0)
-  `);
-  await db.run(`
-    INSERT INTO inward_entries (productId, quantity, date, rackId, containerId, containerQuantity, grossWeight, netWeight) 
-    VALUES (3, 3, '2025-04-27', 3, 2, 3, 51.0, 45.0)
-  `);
+  await db.add('inward_entries', {
+    productId: product1Id,
+    quantity: 5,
+    date: '2025-04-25',
+    rackId: rackAId,
+    containerId: bagId,
+    containerQuantity: 2,
+    grossWeight: 13.5,
+    netWeight: 12.5,
+    remark1: null,
+    remark2: null,
+    remark3: null
+  });
+  
+  await db.add('inward_entries', {
+    productId: product2Id,
+    quantity: 10,
+    date: '2025-04-26',
+    rackId: rackBId,
+    containerId: crateId,
+    containerQuantity: 1,
+    grossWeight: 4.0,
+    netWeight: 2.0,
+    remark1: null,
+    remark2: null,
+    remark3: null
+  });
+  
+  await db.add('inward_entries', {
+    productId: product3Id,
+    quantity: 3,
+    date: '2025-04-27',
+    rackId: rackCId,
+    containerId: crateId,
+    containerQuantity: 3,
+    grossWeight: 51.0,
+    netWeight: 45.0,
+    remark1: null,
+    remark2: null,
+    remark3: null
+  });
   
   // Insert outward entries
-  await db.run(`
-    INSERT INTO outward_entries (productId, quantity, date, rackId, containerId, containerQuantity, grossWeight, netWeight) 
-    VALUES (1, 2, '2025-04-28', 1, 1, 1, 5.5, 5.0)
-  `);
-  await db.run(`
-    INSERT INTO outward_entries (productId, quantity, date, rackId, containerId, containerQuantity, grossWeight, netWeight) 
-    VALUES (2, 5, '2025-04-29', 2, 2, 1, 3.0, 1.0)
-  `);
-  await db.run(`
-    INSERT INTO outward_entries (productId, quantity, date, rackId, containerId, containerQuantity, grossWeight, netWeight) 
-    VALUES (4, 8, '2025-04-30', 4, 3, 0, 4.0, 4.0)
-  `);
+  await db.add('outward_entries', {
+    productId: product1Id,
+    quantity: 2,
+    date: '2025-04-28',
+    rackId: rackAId,
+    containerId: bagId,
+    containerQuantity: 1,
+    grossWeight: 5.5,
+    netWeight: 5.0,
+    remark1: null,
+    remark2: null,
+    remark3: null
+  });
+  
+  await db.add('outward_entries', {
+    productId: product2Id,
+    quantity: 5,
+    date: '2025-04-29',
+    rackId: rackBId,
+    containerId: crateId,
+    containerQuantity: 1,
+    grossWeight: 3.0,
+    netWeight: 1.0,
+    remark1: null,
+    remark2: null,
+    remark3: null
+  });
+  
+  await db.add('outward_entries', {
+    productId: product4Id,
+    quantity: 8,
+    date: '2025-04-30',
+    rackId: rackDId,
+    containerId: looseId,
+    containerQuantity: 0,
+    grossWeight: 4.0,
+    netWeight: 4.0,
+    remark1: null,
+    remark2: null,
+    remark3: null
+  });
 };
 
 // Product Services
 export const getProducts = async (): Promise<Product[]> => {
   if (!db) await initDatabase();
-  return await db!.all('SELECT * FROM products');
+  return await db!.getAll('products');
 };
 
 export const getProduct = async (id: number): Promise<Product | undefined> => {
   if (!db) await initDatabase();
-  return await db!.get('SELECT * FROM products WHERE id = ?', id);
+  return await db!.get('products', id);
 };
 
 export const addProduct = async (product: Omit<Product, 'id'>): Promise<Product> => {
   if (!db) await initDatabase();
-  const result = await db!.run(
-    'INSERT INTO products (name, rack, weightPerPiece, measurement, temp1, temp2, temp3, remark, openingStock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [product.name, product.rack, product.weightPerPiece, product.measurement, product.temp1, product.temp2, product.temp3, product.remark, product.openingStock]
-  );
-  return { ...product, id: result.lastID! };
+  const id = await db!.add('products', product);
+  return { ...product, id: id as number };
 };
 
 export const updateProduct = async (updatedProduct: Product): Promise<Product | undefined> => {
   if (!db) await initDatabase();
-  await db!.run(
-    'UPDATE products SET name = ?, rack = ?, weightPerPiece = ?, measurement = ?, temp1 = ?, temp2 = ?, temp3 = ?, remark = ?, openingStock = ? WHERE id = ?',
-    [updatedProduct.name, updatedProduct.rack, updatedProduct.weightPerPiece, updatedProduct.measurement, updatedProduct.temp1, updatedProduct.temp2, updatedProduct.temp3, updatedProduct.remark, updatedProduct.openingStock, updatedProduct.id]
-  );
+  await db!.put('products', updatedProduct);
   return updatedProduct;
 };
 
 export const deleteProduct = async (id: number): Promise<boolean> => {
   if (!db) await initDatabase();
-  const result = await db!.run('DELETE FROM products WHERE id = ?', id);
-  return result.changes! > 0;
+  await db!.delete('products', id);
+  return true;
 };
 
 // Rack Services
 export const getRacks = async (): Promise<Rack[]> => {
   if (!db) await initDatabase();
-  return await db!.all('SELECT * FROM racks');
+  return await db!.getAll('racks');
 };
 
 export const getRack = async (id: number): Promise<Rack | undefined> => {
   if (!db) await initDatabase();
-  return await db!.get('SELECT * FROM racks WHERE id = ?', id);
+  return await db!.get('racks', id);
 };
 
 export const addRack = async (rack: Omit<Rack, 'id'>): Promise<Rack> => {
   if (!db) await initDatabase();
-  const result = await db!.run(
-    'INSERT INTO racks (number, temp1, temp2, remark) VALUES (?, ?, ?, ?)',
-    [rack.number, rack.temp1, rack.temp2, rack.remark]
-  );
-  return { ...rack, id: result.lastID! };
+  const id = await db!.add('racks', rack);
+  return { ...rack, id: id as number };
 };
 
 export const updateRack = async (updatedRack: Rack): Promise<Rack | undefined> => {
   if (!db) await initDatabase();
-  await db!.run(
-    'UPDATE racks SET number = ?, temp1 = ?, temp2 = ?, remark = ? WHERE id = ?',
-    [updatedRack.number, updatedRack.temp1, updatedRack.temp2, updatedRack.remark, updatedRack.id]
-  );
+  await db!.put('racks', updatedRack);
   return updatedRack;
 };
 
 export const deleteRack = async (id: number): Promise<boolean> => {
   if (!db) await initDatabase();
-  const result = await db!.run('DELETE FROM racks WHERE id = ?', id);
-  return result.changes! > 0;
+  await db!.delete('racks', id);
+  return true;
 };
 
 // Container Services
 export const getContainers = async (): Promise<Container[]> => {
   if (!db) await initDatabase();
-  return await db!.all('SELECT * FROM containers');
+  return await db!.getAll('containers');
 };
 
 export const getContainer = async (id: number): Promise<Container | undefined> => {
   if (!db) await initDatabase();
-  return await db!.get('SELECT * FROM containers WHERE id = ?', id);
+  return await db!.get('containers', id);
 };
 
 export const addContainer = async (container: Omit<Container, 'id'>): Promise<Container> => {
   if (!db) await initDatabase();
-  const result = await db!.run(
-    'INSERT INTO containers (type, weight, remark) VALUES (?, ?, ?)',
-    [container.type, container.weight, container.remark]
-  );
-  return { ...container, id: result.lastID! };
+  const id = await db!.add('containers', container);
+  return { ...container, id: id as number };
 };
 
 export const updateContainer = async (updatedContainer: Container): Promise<Container | undefined> => {
   if (!db) await initDatabase();
-  await db!.run(
-    'UPDATE containers SET type = ?, weight = ?, remark = ? WHERE id = ?',
-    [updatedContainer.type, updatedContainer.weight, updatedContainer.remark, updatedContainer.id]
-  );
+  await db!.put('containers', updatedContainer);
   return updatedContainer;
 };
 
 export const deleteContainer = async (id: number): Promise<boolean> => {
   if (!db) await initDatabase();
-  const result = await db!.run('DELETE FROM containers WHERE id = ?', id);
-  return result.changes! > 0;
+  await db!.delete('containers', id);
+  return true;
 };
 
 // Measurement Services
 export const getMeasurements = async (): Promise<Measurement[]> => {
   if (!db) await initDatabase();
-  return await db!.all('SELECT * FROM measurements');
+  return await db!.getAll('measurements');
 };
 
 export const getMeasurement = async (id: number): Promise<Measurement | undefined> => {
   if (!db) await initDatabase();
-  return await db!.get('SELECT * FROM measurements WHERE id = ?', id);
+  return await db!.get('measurements', id);
 };
 
 export const addMeasurement = async (measurement: Omit<Measurement, 'id'>): Promise<Measurement> => {
   if (!db) await initDatabase();
-  const result = await db!.run(
-    'INSERT INTO measurements (type, temp1, temp2, remark) VALUES (?, ?, ?, ?)',
-    [measurement.type, measurement.temp1, measurement.temp2, measurement.remark]
-  );
-  return { ...measurement, id: result.lastID! };
+  const id = await db!.add('measurements', measurement);
+  return { ...measurement, id: id as number };
 };
 
 export const updateMeasurement = async (updatedMeasurement: Measurement): Promise<Measurement | undefined> => {
   if (!db) await initDatabase();
-  await db!.run(
-    'UPDATE measurements SET type = ?, temp1 = ?, temp2 = ?, remark = ? WHERE id = ?',
-    [updatedMeasurement.type, updatedMeasurement.temp1, updatedMeasurement.temp2, updatedMeasurement.remark, updatedMeasurement.id]
-  );
+  await db!.put('measurements', updatedMeasurement);
   return updatedMeasurement;
 };
 
 export const deleteMeasurement = async (id: number): Promise<boolean> => {
   if (!db) await initDatabase();
-  const result = await db!.run('DELETE FROM measurements WHERE id = ?', id);
-  return result.changes! > 0;
+  await db!.delete('measurements', id);
+  return true;
 };
 
 // Inward Services
 export const getInwardEntries = async (): Promise<InwardEntry[]> => {
   if (!db) await initDatabase();
-  return await db!.all('SELECT * FROM inward_entries');
+  return await db!.getAll('inward_entries');
 };
 
 export const addInwardEntry = async (entry: Omit<InwardEntry, 'id'>): Promise<InwardEntry> => {
   if (!db) await initDatabase();
-  const result = await db!.run(
-    'INSERT INTO inward_entries (productId, quantity, date, rackId, containerId, containerQuantity, grossWeight, netWeight, remark1, remark2, remark3) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [entry.productId, entry.quantity, entry.date, entry.rackId, entry.containerId, entry.containerQuantity, entry.grossWeight, entry.netWeight, entry.remark1, entry.remark2, entry.remark3]
-  );
-  return { ...entry, id: result.lastID! };
+  const id = await db!.add('inward_entries', entry);
+  return { ...entry, id: id as number };
 };
 
 export const updateInwardEntry = async (updatedEntry: InwardEntry): Promise<InwardEntry | undefined> => {
   if (!db) await initDatabase();
-  await db!.run(
-    'UPDATE inward_entries SET productId = ?, quantity = ?, date = ?, rackId = ?, containerId = ?, containerQuantity = ?, grossWeight = ?, netWeight = ?, remark1 = ?, remark2 = ?, remark3 = ? WHERE id = ?',
-    [updatedEntry.productId, updatedEntry.quantity, updatedEntry.date, updatedEntry.rackId, updatedEntry.containerId, updatedEntry.containerQuantity, updatedEntry.grossWeight, updatedEntry.netWeight, updatedEntry.remark1, updatedEntry.remark2, updatedEntry.remark3, updatedEntry.id]
-  );
+  await db!.put('inward_entries', updatedEntry);
   return updatedEntry;
 };
 
 export const deleteInwardEntry = async (id: number): Promise<boolean> => {
   if (!db) await initDatabase();
-  const result = await db!.run('DELETE FROM inward_entries WHERE id = ?', id);
-  return result.changes! > 0;
+  await db!.delete('inward_entries', id);
+  return true;
 };
 
 // Outward Services
 export const getOutwardEntries = async (): Promise<OutwardEntry[]> => {
   if (!db) await initDatabase();
-  return await db!.all('SELECT * FROM outward_entries');
+  return await db!.getAll('outward_entries');
 };
 
 export const addOutwardEntry = async (entry: Omit<OutwardEntry, 'id'>): Promise<OutwardEntry> => {
   if (!db) await initDatabase();
-  const result = await db!.run(
-    'INSERT INTO outward_entries (productId, quantity, date, rackId, containerId, containerQuantity, grossWeight, netWeight, remark1, remark2, remark3) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [entry.productId, entry.quantity, entry.date, entry.rackId, entry.containerId, entry.containerQuantity, entry.grossWeight, entry.netWeight, entry.remark1, entry.remark2, entry.remark3]
-  );
-  return { ...entry, id: result.lastID! };
+  const id = await db!.add('outward_entries', entry);
+  return { ...entry, id: id as number };
 };
 
 export const updateOutwardEntry = async (updatedEntry: OutwardEntry): Promise<OutwardEntry | undefined> => {
   if (!db) await initDatabase();
-  await db!.run(
-    'UPDATE outward_entries SET productId = ?, quantity = ?, date = ?, rackId = ?, containerId = ?, containerQuantity = ?, grossWeight = ?, netWeight = ?, remark1 = ?, remark2 = ?, remark3 = ? WHERE id = ?',
-    [updatedEntry.productId, updatedEntry.quantity, updatedEntry.date, updatedEntry.rackId, updatedEntry.containerId, updatedEntry.containerQuantity, updatedEntry.grossWeight, updatedEntry.netWeight, updatedEntry.remark1, updatedEntry.remark2, updatedEntry.remark3, updatedEntry.id]
-  );
+  await db!.put('outward_entries', updatedEntry);
   return updatedEntry;
 };
 
 export const deleteOutwardEntry = async (id: number): Promise<boolean> => {
   if (!db) await initDatabase();
-  const result = await db!.run('DELETE FROM outward_entries WHERE id = ?', id);
-  return result.changes! > 0;
+  await db!.delete('outward_entries', id);
+  return true;
 };
 
 // Stock Summary Service
 export const getStockSummary = async (): Promise<StockSummary[]> => {
   if (!db) await initDatabase();
   
-  const products = await db!.all(`
-    SELECT 
-      p.id as productId, 
-      p.name as productName, 
-      p.rack, 
-      p.openingStock,
-      COALESCE(SUM(i.quantity), 0) as inwardTotal,
-      COALESCE(SUM(o.quantity), 0) as outwardTotal,
-      p.openingStock + COALESCE(SUM(i.quantity), 0) - COALESCE(SUM(o.quantity), 0) as currentStock
-    FROM 
-      products p
-    LEFT JOIN 
-      (SELECT productId, SUM(quantity) as quantity FROM inward_entries GROUP BY productId) i ON p.id = i.productId
-    LEFT JOIN 
-      (SELECT productId, SUM(quantity) as quantity FROM outward_entries GROUP BY productId) o ON p.id = o.productId
-    GROUP BY 
-      p.id
-  `);
+  const products = await db!.getAll('products');
+  const inwards = await db!.getAll('inward_entries');
+  const outwards = await db!.getAll('outward_entries');
   
-  return products;
+  return products.map(product => {
+    const productInwards = inwards.filter(i => i.productId === product.id);
+    const productOutwards = outwards.filter(o => o.productId === product.id);
+    
+    const inwardTotal = productInwards.reduce((total, entry) => total + entry.quantity, 0);
+    const outwardTotal = productOutwards.reduce((total, entry) => total + entry.quantity, 0);
+    const currentStock = product.openingStock + inwardTotal - outwardTotal;
+    
+    return {
+      productId: product.id,
+      productName: product.name,
+      rack: product.rack,
+      openingStock: product.openingStock,
+      inwardTotal,
+      outwardTotal,
+      currentStock
+    };
+  });
 };
 
 // Helper function to get rack name by ID
 export const getRackNameById = async (rackId: number): Promise<string> => {
   if (!db) await initDatabase();
-  const rack = await db!.get('SELECT number FROM racks WHERE id = ?', rackId);
+  const rack = await db!.get('racks', rackId);
   return rack ? rack.number : 'Unknown';
 };
 
 // Helper function to get container type by ID
 export const getContainerTypeById = async (containerId: number): Promise<string> => {
   if (!db) await initDatabase();
-  const container = await db!.get('SELECT type FROM containers WHERE id = ?', containerId);
+  const container = await db!.get('containers', containerId);
   return container ? container.type : 'Unknown';
 };
 
 // Helper function to calculate net weight
 export const calculateNetWeight = async (grossWeight: number, containerId: number, containerQty: number): Promise<number> => {
   if (!db) await initDatabase();
-  const container = await db!.get('SELECT weight FROM containers WHERE id = ?', containerId);
+  const container = await db!.get('containers', containerId);
   if (!container) return grossWeight;
   
   return grossWeight - (container.weight * containerQty);
