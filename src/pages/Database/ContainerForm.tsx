@@ -4,13 +4,6 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -21,7 +14,7 @@ import {
   TableRow, 
   TableCell 
 } from '@/components/ui/table';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, FileImport } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   addContainer, 
@@ -31,8 +24,7 @@ import {
 } from '@/services/dataService';
 import { Container } from '@/types';
 import PageHeader from '@/components/PageHeader';
-
-const containerTypes = ['Bag', 'Crate', 'Loose', 'Op1', 'Op2'] as const;
+import ExcelImportDialog from '@/components/ExcelImportDialog';
 
 const ContainerForm = () => {
   const [containers, setContainers] = useState<Container[]>([]);
@@ -123,8 +115,33 @@ const ContainerForm = () => {
     reset();
   };
 
-  const handleTypeChange = (value: string) => {
-    setValue('type', value as any);
+  const handleImport = (data: any[]) => {
+    try {
+      let importCount = 0;
+      data.forEach((item) => {
+        if (item.type && item.weight) {
+          addContainer({
+            type: item.type,
+            weight: parseFloat(item.weight),
+            remark: item.remark || ''
+          });
+          importCount++;
+        }
+      });
+      
+      toast({
+        title: 'Import Successful',
+        description: `${importCount} containers imported successfully.`
+      });
+      
+      loadData();
+    } catch (error) {
+      toast({
+        title: 'Import Failed',
+        description: `Failed to import containers: ${error}`,
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -143,21 +160,12 @@ const ContainerForm = () => {
             <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="type">Container Type</Label>
-                <Select 
-                  onValueChange={handleTypeChange}
-                  defaultValue={editingContainer?.type}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select container type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {containerTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input 
+                  id="type" 
+                  type="text" 
+                  {...register('type', { required: true })} 
+                  placeholder="Enter container type"
+                />
               </div>
               
               <div className="space-y-2">
@@ -192,8 +200,13 @@ const ContainerForm = () => {
         
         <div className="md:col-span-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Container List</CardTitle>
+              <ExcelImportDialog 
+                title="Import Containers" 
+                entityType="container"
+                onImport={handleImport}
+              />
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">

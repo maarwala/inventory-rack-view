@@ -4,13 +4,6 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -31,8 +24,7 @@ import {
 } from '@/services/dataService';
 import { Measurement } from '@/types';
 import PageHeader from '@/components/PageHeader';
-
-const measurementTypes = ['KGS', 'PCS', 'Loose'] as const;
+import ExcelImportDialog from '@/components/ExcelImportDialog';
 
 const MeasurementForm = () => {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
@@ -125,8 +117,34 @@ const MeasurementForm = () => {
     reset();
   };
 
-  const handleTypeChange = (value: string) => {
-    setValue('type', value as any);
+  const handleImport = (data: any[]) => {
+    try {
+      let importCount = 0;
+      data.forEach((item) => {
+        if (item.type) {
+          addMeasurement({
+            type: item.type,
+            temp1: item.temp1 || '',
+            temp2: item.temp2 || '',
+            remark: item.remark || ''
+          });
+          importCount++;
+        }
+      });
+      
+      toast({
+        title: 'Import Successful',
+        description: `${importCount} measurements imported successfully.`
+      });
+      
+      loadData();
+    } catch (error) {
+      toast({
+        title: 'Import Failed',
+        description: `Failed to import measurements: ${error}`,
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -145,21 +163,12 @@ const MeasurementForm = () => {
             <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="type">Measurement Type</Label>
-                <Select 
-                  onValueChange={handleTypeChange}
-                  defaultValue={editingMeasurement?.type}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select measurement type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {measurementTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input 
+                  id="type" 
+                  type="text"
+                  {...register('type', { required: true })} 
+                  placeholder="Enter measurement type"
+                />
               </div>
               
               <div className="space-y-2">
@@ -191,8 +200,13 @@ const MeasurementForm = () => {
         
         <div className="md:col-span-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Measurement List</CardTitle>
+              <ExcelImportDialog 
+                title="Import Measurements" 
+                entityType="measurement"
+                onImport={handleImport}
+              />
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
