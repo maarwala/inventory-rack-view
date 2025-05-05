@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { generateTemplate, parseExcelFile } from '@/utils/excelUtils';
+import { EntityType } from '@/types';
 
 interface ExcelImportDialogProps {
   title: string;
-  entityType: 'product' | 'rack' | 'container' | 'measurement';
+  entityType: EntityType;
   onImport: (data: any[]) => void;
 }
 

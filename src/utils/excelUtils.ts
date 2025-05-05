@@ -1,6 +1,5 @@
-
 import * as XLSX from 'xlsx';
-import { Product, Rack, Container, Measurement } from '@/types';
+import { Product, Rack, Container, Measurement, EntityType } from '@/types';
 
 // Define template structures for each entity type
 export const productTemplate = [
@@ -19,8 +18,13 @@ export const measurementTemplate = [
   'type', 'temp1', 'temp2', 'remark'
 ];
 
+export const inwardTemplate = [
+  'productId', 'quantity', 'date', 'rackId', 'containerId', 'containerQuantity', 
+  'grossWeight', 'netWeight', 'remark1', 'remark2', 'remark3'
+];
+
 // Function to generate template Excel files
-export const generateTemplate = (templateType: 'product' | 'rack' | 'container' | 'measurement'): Blob => {
+export const generateTemplate = (templateType: EntityType): Blob => {
   let templateData: string[] = [];
   
   switch(templateType) {
@@ -35,6 +39,9 @@ export const generateTemplate = (templateType: 'product' | 'rack' | 'container' 
       break;
     case 'measurement':
       templateData = measurementTemplate;
+      break;
+    case 'inward':
+      templateData = inwardTemplate;
       break;
   }
   

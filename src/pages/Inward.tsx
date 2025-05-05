@@ -236,7 +236,7 @@ const InwardEntryPage: React.FC = () => {
           <div className="flex gap-2">
             <ExcelImportDialog 
               title="Import Inward Entries" 
-              entityType={"inward" as EntityType}
+              entityType="inward"
               onImport={handleImport}
             />
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
