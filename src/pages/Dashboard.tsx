@@ -19,35 +19,54 @@ const Dashboard: React.FC = () => {
   const [inwardCount, setInwardCount] = useState(0);
   const [outwardCount, setOutwardCount] = useState(0);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Get data for stats
-    const stockSummary = getStockSummary();
-    const products = getProducts();
-    const inward = getInwardEntries();
-    const outward = getOutwardEntries();
+    const loadData = async () => {
+      try {
+        // Get data for stats
+        const stockSummary = await getStockSummary();
+        const products = await getProducts();
+        const inward = await getInwardEntries();
+        const outward = await getOutwardEntries();
 
-    // Calculate stats
-    setLowStockCount(stockSummary.filter(item => item.currentStock <= 5).length);
-    setTotalItems(products.length);
-    setInwardCount(inward.length);
-    setOutwardCount(outward.length);
+        // Calculate stats
+        setLowStockCount(stockSummary.filter(item => item.currentStock <= 5).length);
+        setTotalItems(products.length);
+        setInwardCount(inward.length);
+        setOutwardCount(outward.length);
 
-    // Prepare chart data - get top 5 items by current stock
-    const topItems = [...stockSummary]
-      .sort((a, b) => b.currentStock - a.currentStock)
-      .slice(0, 5)
-      .map(item => ({
-        name: item.productName.length > 10 
-          ? item.productName.substring(0, 10) + '...' 
-          : item.productName,
-        current: item.currentStock,
-        inward: item.inwardTotal,
-        outward: item.outwardTotal
-      }));
-      
-    setChartData(topItems);
+        // Prepare chart data - get top 5 items by current stock
+        const topItems = [...stockSummary]
+          .sort((a, b) => b.currentStock - a.currentStock)
+          .slice(0, 5)
+          .map(item => ({
+            name: item.productName.length > 10 
+              ? item.productName.substring(0, 10) + '...' 
+              : item.productName,
+            current: item.currentStock,
+            inward: item.inwardTotal,
+            outward: item.outwardTotal
+          }));
+          
+        setChartData(topItems);
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading dashboard data...</p>
+      </div>
+    );
+  }
 
   return (
     <div>

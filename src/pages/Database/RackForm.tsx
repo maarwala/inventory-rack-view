@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -30,6 +29,7 @@ const RackForm = () => {
   const [racks, setRacks] = useState<Rack[]>([]);
   const [editingRack, setEditingRack] = useState<Rack | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm<Rack>();
 
@@ -37,8 +37,21 @@ const RackForm = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setRacks(getRacks());
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getRacks();
+      setRacks(data);
+    } catch (error) {
+      console.error("Error loading racks:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load racks",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -51,16 +64,16 @@ const RackForm = () => {
     }
   }, [editingRack, setValue]);
 
-  const handleFormSubmit = (data: Rack) => {
+  const handleFormSubmit = async (data: Rack) => {
     try {
       if (editingRack) {
-        updateRack(data);
+        await updateRack(data);
         toast({
           title: 'Rack Updated',
           description: `Rack "${data.number}" has been updated successfully.`
         });
       } else {
-        const newRack = addRack({
+        const newRack = await addRack({
           number: data.number,
           temp1: data.temp1,
           temp2: data.temp2,
@@ -155,6 +168,14 @@ const RackForm = () => {
   const filteredRacks = racks.filter(rack => 
     rack.number.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading racks...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

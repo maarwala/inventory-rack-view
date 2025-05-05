@@ -59,6 +59,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedContainer, setSelectedContainer] = useState<Container | null>(null);
   const [selectedRack, setSelectedRack] = useState<Rack | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FormValues>({
@@ -85,10 +86,30 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
   
   useEffect(() => {
     // Load reference data
-    setProducts(getProducts());
-    setRacks(getRacks());
-    setContainers(getContainers());
-  }, []);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const productsData = await getProducts();
+        const racksData = await getRacks();
+        const containersData = await getContainers();
+        
+        setProducts(productsData);
+        setRacks(racksData);
+        setContainers(containersData);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load reference data",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [toast]);
   
   // Filter products based on search term
   const filteredProducts = useMemo(() => {
@@ -115,7 +136,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
     setValue('rackId', rackId);
   };
   
-  const handleFormSubmit = (data: FormValues) => {
+  const handleFormSubmit = async (data: FormValues) => {
     try {
       if (!selectedProduct) {
         toast({
@@ -141,13 +162,13 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
       };
       
       if (type === 'inward') {
-        addInwardEntry(entry);
+        await addInwardEntry(entry);
         toast({
           title: "Inward Entry Added",
           description: `${data.quantity} units of ${selectedProduct.name} successfully added to inventory.`
         });
       } else {
-        addOutwardEntry(entry);
+        await addOutwardEntry(entry);
         toast({
           title: "Outward Entry Added",
           description: `${data.quantity} units of ${selectedProduct.name} successfully removed from inventory.`
@@ -182,6 +203,16 @@ const EntryForm: React.FC<EntryFormProps> = ({ type }) => {
     label: `${container.type} (${container.weight}kg)`,
     value: container.id
   }));
+  
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center">Loading data...</p>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <Card>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +22,7 @@ const Products: React.FC = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [newProduct, setNewProduct] = useState<Omit<Product, 'id'>>({
     name: '',
     rack: '',
@@ -40,10 +40,26 @@ const Products: React.FC = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setProducts(getProducts());
-    setMeasurements(getMeasurements());
-    setRacks(getRacks());
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const productsData = await getProducts();
+      const measurementsData = await getMeasurements();
+      const racksData = await getRacks();
+      
+      setProducts(productsData);
+      setMeasurements(measurementsData);
+      setRacks(racksData);
+    } catch (error) {
+      console.error("Error loading product data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load product data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,6 +186,14 @@ const Products: React.FC = () => {
     label: rack.number,
     value: rack.number
   }));
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading products...</p>
+      </div>
+    );
+  }
 
   return (
     <div>

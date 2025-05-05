@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -42,6 +41,7 @@ const ItemForm = () => {
   const [racks, setRacks] = useState<Rack[]>([]);
   const [editingItem, setEditingItem] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue, watch } = useForm<Product>();
 
@@ -49,10 +49,26 @@ const ItemForm = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setItems(getProducts());
-    setMeasurements(getMeasurements());
-    setRacks(getRacks());
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const productsData = await getProducts();
+      const measurementsData = await getMeasurements();
+      const racksData = await getRacks();
+      
+      setItems(productsData);
+      setMeasurements(measurementsData);
+      setRacks(racksData);
+    } catch (error) {
+      console.error("Error loading item data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load item data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -70,16 +86,16 @@ const ItemForm = () => {
     }
   }, [editingItem, setValue]);
 
-  const handleFormSubmit = (data: Product) => {
+  const handleFormSubmit = async (data: Product) => {
     try {
       if (editingItem) {
-        updateProduct(data);
+        await updateProduct(data);
         toast({
           title: 'Item Updated',
           description: `Item "${data.name}" has been updated successfully.`
         });
       } else {
-        const newItem = addProduct({
+        const newItem = await addProduct({
           name: data.name,
           rack: data.rack,
           weightPerPiece: data.weightPerPiece,
@@ -191,6 +207,14 @@ const ItemForm = () => {
     label: rack.number,
     value: rack.number
   }));
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading items data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

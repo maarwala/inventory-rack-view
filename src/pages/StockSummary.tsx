@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,19 +15,32 @@ const StockSummaryPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [rackFilter, setRackFilter] = useState<string>('all');
   const [availableRacks, setAvailableRacks] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const data = getStockSummary();
-    setSummary(data);
-    
-    // Extract unique rack names
-    const racks = Array.from(new Set(data.map(item => item.rack)));
-    setAvailableRacks(racks);
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getStockSummary();
+      setSummary(data);
+      
+      // Extract unique rack names
+      const racks = Array.from(new Set(data.map(item => item.rack)));
+      setAvailableRacks(racks);
+    } catch (error) {
+      console.error("Error loading stock summary:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load stock summary",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,6 +81,14 @@ const StockSummaryPage: React.FC = () => {
     acc[item.rack].push(item);
     return acc;
   }, {} as Record<string, StockSummary[]>);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading stock summary...</p>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -58,17 +58,35 @@ const InwardEntryPage: React.FC = () => {
     remark3: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setProducts(getProducts());
-    setRacks(getRacks());
-    setContainers(getContainers());
-    setEntries(getInwardEntries());
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const productsData = await getProducts();
+      const racksData = await getRacks();
+      const containersData = await getContainers();
+      const entriesData = await getInwardEntries();
+      
+      setProducts(productsData);
+      setRacks(racksData);
+      setContainers(containersData);
+      setEntries(entriesData);
+    } catch (error) {
+      console.error("Error loading inward data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load inward data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,6 +244,14 @@ const InwardEntryPage: React.FC = () => {
     label: `${container.type} (${container.weight}kg)`,
     value: container.id
   }));
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading inward entries...</p>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +21,7 @@ const OutwardEntryPage: React.FC = () => {
   const [entries, setEntries] = useState<OutwardEntry[]>([]);
   const [stockSummary, setStockSummary] = useState<StockSummary[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [newEntry, setNewEntry] = useState<Omit<OutwardEntry, 'id'>>({
     productId: 0,
     quantity: 1,
@@ -42,12 +42,30 @@ const OutwardEntryPage: React.FC = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setProducts(getProducts());
-    setRacks(getRacks());
-    setContainers(getContainers());
-    setEntries(getOutwardEntries());
-    setStockSummary(getStockSummary());
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const productsData = await getProducts();
+      const racksData = await getRacks();
+      const containersData = await getContainers();
+      const entriesData = await getOutwardEntries();
+      const summaryData = await getStockSummary();
+      
+      setProducts(productsData);
+      setRacks(racksData);
+      setContainers(containersData);
+      setEntries(entriesData);
+      setStockSummary(summaryData);
+    } catch (error) {
+      console.error("Error loading outward data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load outward data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,6 +138,14 @@ const OutwardEntryPage: React.FC = () => {
     const productName = getProductName(entry.productId).toLowerCase();
     return productName.includes(searchTerm.toLowerCase());
   });
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading outward entries...</p>
+      </div>
+    );
+  }
 
   return (
     <div>

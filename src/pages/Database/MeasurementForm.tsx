@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -29,6 +28,7 @@ import ExcelImportDialog from '@/components/ExcelImportDialog';
 const MeasurementForm = () => {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [editingMeasurement, setEditingMeasurement] = useState<Measurement | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm<Measurement>();
 
@@ -36,8 +36,21 @@ const MeasurementForm = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setMeasurements(getMeasurements());
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getMeasurements();
+      setMeasurements(data);
+    } catch (error) {
+      console.error("Error loading measurements:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load measurements",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -50,16 +63,16 @@ const MeasurementForm = () => {
     }
   }, [editingMeasurement, setValue]);
 
-  const handleFormSubmit = (data: Measurement) => {
+  const handleFormSubmit = async (data: Measurement) => {
     try {
       if (editingMeasurement) {
-        updateMeasurement(data);
+        await updateMeasurement(data);
         toast({
           title: 'Measurement Updated',
           description: `Measurement "${data.type}" has been updated successfully.`
         });
       } else {
-        const newMeasurement = addMeasurement({
+        const newMeasurement = await addMeasurement({
           type: data.type,
           temp1: data.temp1,
           temp2: data.temp2,
@@ -146,6 +159,14 @@ const MeasurementForm = () => {
       });
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading measurements...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

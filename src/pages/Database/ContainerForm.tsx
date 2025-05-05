@@ -28,6 +28,7 @@ import ExcelImportDialog from '@/components/ExcelImportDialog';
 const ContainerForm = () => {
   const [containers, setContainers] = useState<Container[]>([]);
   const [editingContainer, setEditingContainer] = useState<Container | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue, watch } = useForm<Container>();
 
@@ -35,8 +36,21 @@ const ContainerForm = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setContainers(getContainers());
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getContainers();
+      setContainers(data);
+    } catch (error) {
+      console.error("Error loading containers:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load containers",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -48,16 +62,16 @@ const ContainerForm = () => {
     }
   }, [editingContainer, setValue]);
 
-  const handleFormSubmit = (data: Container) => {
+  const handleFormSubmit = async (data: Container) => {
     try {
       if (editingContainer) {
-        updateContainer(data);
+        await updateContainer(data);
         toast({
           title: 'Container Updated',
           description: `Container "${data.type}" has been updated successfully.`
         });
       } else {
-        const newContainer = addContainer({
+        const newContainer = await addContainer({
           type: data.type,
           weight: data.weight,
           remark: data.remark,
@@ -142,6 +156,14 @@ const ContainerForm = () => {
       });
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 text-center">
+        <p>Loading containers...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
