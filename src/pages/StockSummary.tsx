@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +10,16 @@ import { StockSummary } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Download } from 'lucide-react';
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem, 
+  PaginationLink, 
+  PaginationNext, 
+  PaginationPrevious 
+} from '@/components/ui/pagination';
+
+const ITEMS_PER_PAGE = 10;
 
 const StockSummaryPage: React.FC = () => {
   const [summary, setSummary] = useState<StockSummary[]>([]);
@@ -16,6 +27,7 @@ const StockSummaryPage: React.FC = () => {
   const [rackFilter, setRackFilter] = useState<string>('all');
   const [availableRacks, setAvailableRacks] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -45,10 +57,12 @@ const StockSummaryPage: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleRackFilterChange = (value: string) => {
     setRackFilter(value);
+    setCurrentPage(1); // Reset to first page when filtering
   };
 
   const filteredSummary = summary.filter(item => {
@@ -56,6 +70,64 @@ const StockSummaryPage: React.FC = () => {
     const matchesRack = rackFilter === 'all' || item.rack === rackFilter;
     return matchesSearch && matchesRack;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredSummary.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedSummary = filteredSummary.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPageButtons = 5;
+    
+    if (totalPages <= maxPageButtons) {
+      // Show all pages if total pages are less than max buttons
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+      
+      // Calculate start and end of middle pages
+      let start = Math.max(2, currentPage - 1);
+      let end = Math.min(totalPages - 1, currentPage + 1);
+      
+      // Adjust if at start or end
+      if (currentPage <= 3) {
+        end = Math.min(totalPages - 1, 4);
+      } else if (currentPage >= totalPages - 2) {
+        start = Math.max(2, totalPages - 3);
+      }
+      
+      // Add ellipsis after first page if needed
+      if (start > 2) {
+        pages.push(-1); // Use -1 to indicate ellipsis
+      }
+      
+      // Add middle pages
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      
+      // Add ellipsis before last page if needed
+      if (end < totalPages - 1) {
+        pages.push(-2); // Use -2 to indicate ellipsis
+      }
+      
+      // Always show last page
+      if (totalPages > 1) {
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  };
 
   const handleExport = () => {
     // In a real application, this would generate a PDF or Excel file
@@ -73,8 +145,8 @@ const StockSummaryPage: React.FC = () => {
     }, 1500);
   };
 
-  // Group by rack for rack-wise view
-  const rackwiseSummary = filteredSummary.reduce((acc, item) => {
+  // Group by rack for rack-wise view - now using only paginated data
+  const rackwiseSummary = paginatedSummary.reduce((acc, item) => {
     if (!acc[item.rack]) {
       acc[item.rack] = [];
     }
@@ -126,6 +198,10 @@ const StockSummaryPage: React.FC = () => {
         </Select>
       </div>
       
+      <div className="text-sm text-muted-foreground mb-2">
+        Showing {paginatedSummary.length} of {filteredSummary.length} items (Page {currentPage} of {totalPages || 1})
+      </div>
+      
       <Tabs defaultValue="product-wise" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="product-wise">Product View</TabsTrigger>
@@ -146,8 +222,8 @@ const StockSummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSummary.length > 0 ? (
-                  filteredSummary.map((item) => (
+                {paginatedSummary.length > 0 ? (
+                  paginatedSummary.map((item) => (
                     <TableRow key={item.productId}>
                       <TableCell className="font-medium">{item.productName}</TableCell>
                       <TableCell>{item.rack}</TableCell>
@@ -169,6 +245,42 @@ const StockSummaryPage: React.FC = () => {
               </TableBody>
             </Table>
           </div>
+          
+          {filteredSummary.length > 0 && (
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                
+                {getPageNumbers().map((page, index) => (
+                  <PaginationItem key={index}>
+                    {page === -1 || page === -2 ? (
+                      <PaginationLink>...</PaginationLink>
+                    ) : (
+                      <PaginationLink
+                        isActive={page === currentPage}
+                        onClick={() => handlePageChange(page)}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </TabsContent>
         
         <TabsContent value="rack-wise">
@@ -208,6 +320,42 @@ const StockSummaryPage: React.FC = () => {
             <div className="p-6 text-center border rounded-md">
               {searchTerm || rackFilter !== 'all' ? 'No products found matching your search criteria.' : 'No products found. Add products to see summary.'}
             </div>
+          )}
+          
+          {filteredSummary.length > 0 && (
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                
+                {getPageNumbers().map((page, index) => (
+                  <PaginationItem key={index}>
+                    {page === -1 || page === -2 ? (
+                      <PaginationLink>...</PaginationLink>
+                    ) : (
+                      <PaginationLink
+                        isActive={page === currentPage}
+                        onClick={() => handlePageChange(page)}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           )}
         </TabsContent>
       </Tabs>
