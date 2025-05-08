@@ -437,6 +437,96 @@ export const getStockSummary = async (): Promise<StockSummary[]> => {
   });
 };
 
+// Optimized version for large datasets
+export const getPaginatedStockSummary = async (
+  page: number = 1, 
+  limit: number = 10,
+  searchTerm: string = '',
+  rackFilter: string = 'all'
+): Promise<{
+  data: StockSummary[],
+  totalCount: number,
+  totalPages: number,
+  availableRacks: string[]
+}> => {
+  if (!db) await initDatabase();
+  
+  console.time('Stock Summary Calculation');
+  
+  // Fetch products in chunks to avoid memory issues
+  const products = await db!.getAll('products');
+  
+  // Extract unique rack names for filters
+  const availableRacks = Array.from(new Set(products.map(item => item.rack)));
+  
+  // Apply search and rack filters first to reduce processing
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = searchTerm ? product.name.toLowerCase().includes(searchTerm.toLowerCase()) : true;
+    const matchesRack = rackFilter === 'all' || product.rack === rackFilter;
+    return matchesSearch && matchesRack;
+  });
+  
+  // Calculate total count and pages
+  const totalCount = filteredProducts.length;
+  const totalPages = Math.ceil(totalCount / limit);
+  
+  // Apply pagination
+  const startIndex = (page - 1) * limit;
+  const paginatedProducts = filteredProducts.slice(startIndex, startIndex + limit);
+  
+  // Fetch only inward/outward entries for the paginated products
+  const productIds = paginatedProducts.map(p => p.id);
+  
+  // Get inward entries for these products
+  const tx = db!.transaction('inward_entries');
+  const inwardIndex = tx.store.index('productId');
+  const inwards: InwardEntry[] = [];
+  
+  for (const id of productIds) {
+    const productInwards = await inwardIndex.getAll(IDBKeyRange.only(id));
+    inwards.push(...productInwards);
+  }
+  
+  // Get outward entries for these products
+  const tx2 = db!.transaction('outward_entries');
+  const outwardIndex = tx2.store.index('productId');
+  const outwards: OutwardEntry[] = [];
+  
+  for (const id of productIds) {
+    const productOutwards = await outwardIndex.getAll(IDBKeyRange.only(id));
+    outwards.push(...productOutwards);
+  }
+  
+  // Calculate summary for each product
+  const data = paginatedProducts.map(product => {
+    const productInwards = inwards.filter(i => i.productId === product.id);
+    const productOutwards = outwards.filter(o => o.productId === product.id);
+    
+    const inwardTotal = productInwards.reduce((total, entry) => total + entry.quantity, 0);
+    const outwardTotal = productOutwards.reduce((total, entry) => total + entry.quantity, 0);
+    const currentStock = product.openingStock + inwardTotal - outwardTotal;
+    
+    return {
+      productId: product.id,
+      productName: product.name,
+      rack: product.rack,
+      openingStock: product.openingStock,
+      inwardTotal,
+      outwardTotal,
+      currentStock
+    };
+  });
+  
+  console.timeEnd('Stock Summary Calculation');
+  
+  return {
+    data,
+    totalCount,
+    totalPages,
+    availableRacks
+  };
+};
+
 // Helper function to get rack name by ID
 export const getRackNameById = async (rackId: number): Promise<string> => {
   if (!db) await initDatabase();

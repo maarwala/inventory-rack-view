@@ -5,18 +5,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PageHeader from '@/components/PageHeader';
-import { getStockSummary } from '@/services/dataService';
+import { getPaginatedStockSummary } from '@/services/dataService';
 import { StockSummary } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Download } from 'lucide-react';
+import { FileText, Download, Loader2 } from 'lucide-react';
 import { 
   Pagination, 
   PaginationContent, 
   PaginationItem, 
   PaginationLink, 
   PaginationNext, 
-  PaginationPrevious 
+  PaginationPrevious, 
+  PaginationEllipsis
 } from '@/components/ui/pagination';
 
 const ITEMS_PER_PAGE = 10;
@@ -28,26 +29,60 @@ const StockSummaryPage: React.FC = () => {
   const [availableRacks, setAvailableRacks] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(currentPage, searchTerm, rackFilter);
+  }, [currentPage]);
 
-  const loadData = async () => {
+  // Handle filter changes with debounce
+  useEffect(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    const timer = setTimeout(() => {
+      // Reset to first page when filters change
+      if (currentPage === 1) {
+        loadData(1, searchTerm, rackFilter);
+      } else {
+        setCurrentPage(1); // This will trigger the first useEffect
+      }
+    }, 500); // 500ms debounce
+    
+    setDebounceTimer(timer);
+    
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, [searchTerm, rackFilter]);
+
+  const loadData = async (page: number, search: string, rack: string) => {
     try {
       setIsLoading(true);
-      const data = await getStockSummary();
-      setSummary(data);
+      console.log(`Loading page ${page} with search: "${search}" and rack filter: "${rack}"`);
       
-      // Extract unique rack names
-      const racks = Array.from(new Set(data.map(item => item.rack)));
-      setAvailableRacks(racks);
+      const result = await getPaginatedStockSummary(
+        page, 
+        ITEMS_PER_PAGE, 
+        search, 
+        rack
+      );
+      
+      setSummary(result.data);
+      setTotalPages(result.totalPages);
+      setTotalItems(result.totalCount);
+      setAvailableRacks(result.availableRacks);
+      
+      console.log(`Loaded ${result.data.length} items. Total: ${result.totalCount}`);
     } catch (error) {
       console.error("Error loading stock summary:", error);
       toast({
         title: "Error",
-        description: "Failed to load stock summary",
+        description: "Failed to load stock summary data",
         variant: "destructive"
       });
     } finally {
@@ -57,24 +92,11 @@ const StockSummaryPage: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handleRackFilterChange = (value: string) => {
     setRackFilter(value);
-    setCurrentPage(1); // Reset to first page when filtering
   };
-
-  const filteredSummary = summary.filter(item => {
-    const matchesSearch = item.productName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRack = rackFilter === 'all' || item.rack === rackFilter;
-    return matchesSearch && matchesRack;
-  });
-
-  // Pagination logic
-  const totalPages = Math.ceil(filteredSummary.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedSummary = filteredSummary.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -145,8 +167,8 @@ const StockSummaryPage: React.FC = () => {
     }, 1500);
   };
 
-  // Group by rack for rack-wise view - now using only paginated data
-  const rackwiseSummary = paginatedSummary.reduce((acc, item) => {
+  // Group by rack for rack-wise view
+  const rackwiseSummary = summary.reduce((acc, item) => {
     if (!acc[item.rack]) {
       acc[item.rack] = [];
     }
@@ -154,12 +176,33 @@ const StockSummaryPage: React.FC = () => {
     return acc;
   }, {} as Record<string, StockSummary[]>);
 
-  if (isLoading) {
-    return (
-      <div className="p-6 text-center">
-        <p>Loading stock summary...</p>
-      </div>
-    );
+  const LoadingState = () => (
+    <div className="flex flex-col items-center justify-center p-10 space-y-4">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <p className="text-lg">Loading stock summary data...</p>
+      <p className="text-sm text-muted-foreground">This may take a moment for large datasets</p>
+    </div>
+  );
+
+  const ErrorState = () => (
+    <div className="flex flex-col items-center justify-center p-10 space-y-4">
+      <p className="text-lg text-destructive">Failed to load stock summary</p>
+      <Button onClick={() => loadData(currentPage, searchTerm, rackFilter)}>
+        Retry
+      </Button>
+    </div>
+  );
+
+  const EmptyState = ({ filtered = false }) => (
+    <div className="p-6 text-center border rounded-md">
+      {filtered 
+        ? 'No products found matching your search criteria.' 
+        : 'No products found. Add products to see summary.'}
+    </div>
+  );
+
+  if (isLoading && currentPage === 1) {
+    return <LoadingState />;
   }
 
   return (
@@ -199,7 +242,15 @@ const StockSummaryPage: React.FC = () => {
       </div>
       
       <div className="text-sm text-muted-foreground mb-2">
-        Showing {paginatedSummary.length} of {filteredSummary.length} items (Page {currentPage} of {totalPages || 1})
+        {isLoading ? (
+          <span className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+          </span>
+        ) : (
+          <span>
+            Showing {summary.length} of {totalItems} items (Page {currentPage} of {totalPages || 1})
+          </span>
+        )}
       </div>
       
       <Tabs defaultValue="product-wise" className="w-full">
@@ -222,8 +273,17 @@ const StockSummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedSummary.length > 0 ? (
-                  paginatedSummary.map((item) => (
+                {isLoading && currentPage !== 1 ? (
+                  <TableRow>
+                    <TableCell colSpan={6}>
+                      <div className="flex justify-center items-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                        <span>Loading data...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : summary.length > 0 ? (
+                  summary.map((item) => (
                     <TableRow key={item.productId}>
                       <TableCell className="font-medium">{item.productName}</TableCell>
                       <TableCell>{item.rack}</TableCell>
@@ -238,7 +298,9 @@ const StockSummaryPage: React.FC = () => {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-6">
-                      {searchTerm || rackFilter !== 'all' ? 'No products found matching your search criteria.' : 'No products found. Add products to see summary.'}
+                      {searchTerm || rackFilter !== 'all' ? 
+                        'No products found matching your search criteria.' : 
+                        'No products found. Add products to see summary.'}
                     </TableCell>
                   </TableRow>
                 )}
@@ -246,7 +308,7 @@ const StockSummaryPage: React.FC = () => {
             </Table>
           </div>
           
-          {filteredSummary.length > 0 && (
+          {totalPages > 0 && (
             <Pagination className="mt-4">
               <PaginationContent>
                 <PaginationItem>
@@ -259,7 +321,7 @@ const StockSummaryPage: React.FC = () => {
                 {getPageNumbers().map((page, index) => (
                   <PaginationItem key={index}>
                     {page === -1 || page === -2 ? (
-                      <PaginationLink>...</PaginationLink>
+                      <PaginationEllipsis />
                     ) : (
                       <PaginationLink
                         isActive={page === currentPage}
@@ -284,7 +346,12 @@ const StockSummaryPage: React.FC = () => {
         </TabsContent>
         
         <TabsContent value="rack-wise">
-          {Object.entries(rackwiseSummary).length > 0 ? (
+          {isLoading && currentPage !== 1 ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+              <span className="text-lg">Loading rack view...</span>
+            </div>
+          ) : Object.entries(rackwiseSummary).length > 0 ? (
             Object.entries(rackwiseSummary).map(([rack, items]) => (
               <div key={rack} className="mb-6">
                 <h3 className="text-lg font-semibold mb-2 bg-muted p-2 rounded-md">Rack: {rack}</h3>
@@ -317,12 +384,10 @@ const StockSummaryPage: React.FC = () => {
               </div>
             ))
           ) : (
-            <div className="p-6 text-center border rounded-md">
-              {searchTerm || rackFilter !== 'all' ? 'No products found matching your search criteria.' : 'No products found. Add products to see summary.'}
-            </div>
+            <EmptyState filtered={searchTerm.length > 0 || rackFilter !== 'all'} />
           )}
           
-          {filteredSummary.length > 0 && (
+          {totalPages > 0 && (
             <Pagination className="mt-4">
               <PaginationContent>
                 <PaginationItem>
@@ -335,7 +400,7 @@ const StockSummaryPage: React.FC = () => {
                 {getPageNumbers().map((page, index) => (
                   <PaginationItem key={index}>
                     {page === -1 || page === -2 ? (
-                      <PaginationLink>...</PaginationLink>
+                      <PaginationEllipsis />
                     ) : (
                       <PaginationLink
                         isActive={page === currentPage}
